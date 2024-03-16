@@ -56,11 +56,10 @@ fn parse_json_number(chars: &Vec<char>, from: usize) -> Result<(usize, f64), Par
             continue;
         }
 
-        if ch == &'.' && !found_decimal {
+        if ch == &'.' && !found_decimal && !parsing_exponent {
             found_decimal = true;
         } else if ch == &'e' || ch == &'E' {
             parsing_exponent = true;
-            found_decimal = false;
         } else if ch == &'+' || ch == &'-' && parsing_exponent && !found_exponent_sign {
             found_exponent_sign = true;
         } else {
