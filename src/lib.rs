@@ -2,8 +2,8 @@
 pub enum JSONValue {
     String(String),
     Number(f64),
-    Object(Box<Vec<(String, JSONValue)>>),
-    Array(Box<Vec<JSONValue>>),
+    Object(Vec<(String, JSONValue)>),
+    Array(Vec<JSONValue>),
     True,
     False,
     Null,
@@ -97,43 +97,66 @@ fn parse_json_literal(
     };
 }
 
-pub fn parse_json(string: &str) -> Result<JSONValue, ParseJSONError> {
-    let mut i = 0;
-    let chars = string.chars().collect::<Vec<char>>();
-
-    let mut output: Option<JSONValue> = None;
-
-    while let Some(ch) = chars.get(i) {
-        if ch.is_whitespace() {
-            i += 1;
-            continue;
-        }
-        if ch == &'"' {
-            let (end_index, parsed_string) = parse_json_string(&chars, i)?;
-            output = Some(JSONValue::String(parsed_string));
-            i = end_index;
-        } else if ch.is_numeric() || ch == &'-' {
-            let (end_index, parsed_number) = parse_json_number(&chars, i)?;
-            output = Some(JSONValue::Number(parsed_number));
-            i = end_index;
-        } else if ch == &'n' {
-            let end_index = parse_json_literal(&chars, i, "null")?;
-            output = Some(JSONValue::Null);
-            i = end_index;
-        } else if ch == &'t' {
-            let end_index = parse_json_literal(&chars, i, "true")?;
-            output = Some(JSONValue::True);
-            i = end_index;
-        } else if ch == &'f' {
-            let end_index = parse_json_literal(&chars, i, "false")?;
-            output = Some(JSONValue::False);
-            i = end_index;
-        }
-
+fn trim_whitespace(chars: &Vec<char>, from: usize) -> usize {
+    let mut i = from;
+    while matches!(chars.get(i), Some(ch) if ch.is_whitespace()) {
         i += 1;
     }
+    return i;
+}
 
-    return output.ok_or(ParseJSONError("Nothing found in ur json".to_string()));
+pub fn parse_json_value(
+    chars: &Vec<char>,
+    from: usize,
+) -> Result<(usize, JSONValue), ParseJSONError> {
+    let mut i = from;
+
+    i = trim_whitespace(chars, i);
+
+    let ch = chars.get(i);
+
+    let (value_end_index, json_value) = match ch {
+        // Strings
+        Some(&'"') => {
+            let (end_index, parsed_string) = parse_json_string(&chars, i)?;
+            (end_index, JSONValue::String(parsed_string))
+        }
+
+        // null
+        Some(&'n') => {
+            let end_index = parse_json_literal(&chars, i, "null")?;
+            (end_index, JSONValue::Null)
+        }
+
+        // booleans
+        Some(&'t') => {
+            let end_index = parse_json_literal(&chars, i, "true")?;
+            (end_index, JSONValue::True)
+        }
+        Some(&'f') => {
+            let end_index = parse_json_literal(&chars, i, "false")?;
+            (end_index, JSONValue::False)
+        }
+
+        Some(ch) if ch.is_numeric() || ch == &'-' => {
+            let (end_index, parsed_number) = parse_json_number(&chars, i)?;
+            (end_index, JSONValue::Number(parsed_number))
+        }
+
+        _ => return Err(ParseJSONError("No JSON value found".to_string())),
+    };
+
+    i = trim_whitespace(chars, value_end_index);
+
+    return Ok((i, json_value));
+}
+
+pub fn parse_json(string: &str) -> Result<JSONValue, ParseJSONError> {
+    let chars = string.chars().collect::<Vec<char>>();
+
+    let (_end_index, json_value) = parse_json_value(&chars, 0)?;
+
+    return Ok(json_value);
 }
 
 #[cfg(test)]
@@ -220,6 +243,6 @@ mod tests {
     #[test]
     #[ignore]
     fn parse_json_empty_object() {
-        assert_eq!(parse_json("{}"), Ok(JSONValue::Object(Box::new(vec![]))))
+        assert_eq!(parse_json("{}"), Ok(JSONValue::Object(vec![])))
     }
 }
