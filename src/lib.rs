@@ -111,6 +111,7 @@ fn parse_json_array(
     let mut i = from + 1;
 
     let mut output = vec![];
+    let mut array_should_end = false;
     let mut is_ok_for_array_to_end = true;
 
     while let Some(ch) = chars.get(i) {
@@ -118,6 +119,8 @@ fn parse_json_array(
 
         if ch == &']' && is_ok_for_array_to_end {
             break;
+        } else if array_should_end {
+            return Err(ParseJSONError("Expected ']' to end array".to_string()));
         } else if ch == &',' {
             return Err(ParseJSONError("Unexpected comma".to_string()));
         }
@@ -133,6 +136,7 @@ fn parse_json_array(
             i += 1;
             is_ok_for_array_to_end = false;
         } else {
+            array_should_end = true;
             is_ok_for_array_to_end = true;
         }
     }
@@ -308,6 +312,14 @@ mod tests {
     fn parse_json_array_trailing_comma() {
         assert_eq!(
             parse_json_array(&"[1, 2,]".chars().collect(), 0),
+            Err(ParseJSONError("No JSON value found".to_string()))
+        )
+    }
+
+    #[test]
+    fn parse_json_array_double_comma() {
+        assert_eq!(
+            parse_json_array(&"[1, 2,,]".chars().collect(), 0),
             Err(ParseJSONError("Unexpected comma".to_string()))
         )
     }
@@ -316,7 +328,7 @@ mod tests {
     fn parse_json_array_missing_comma() {
         assert_eq!(
             parse_json_array(&"[1, 2  3]".chars().collect(), 0),
-            Err(ParseJSONError("Unexpected comma".to_string()))
+            Err(ParseJSONError("Expected ']' to end array".to_string()))
         )
     }
 
