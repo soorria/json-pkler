@@ -14,9 +14,11 @@ pub struct JSONBuilder {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseJSONError(String);
 
+type JSONParseResult<T> = Result<T, ParseJSONError>;
+
 /// Given the chars, and position of the starting '"', returns
 /// the index of the end quote and the found string
-fn parse_json_string(chars: &Vec<char>, from: usize) -> Result<(usize, String), ParseJSONError> {
+fn parse_json_string(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, String)> {
     let mut i = from + 1;
     let mut string_end_found = false;
 
@@ -38,7 +40,7 @@ fn parse_json_string(chars: &Vec<char>, from: usize) -> Result<(usize, String), 
     return Ok((i, chars[from + 1..i].iter().collect()));
 }
 
-fn parse_json_number(chars: &Vec<char>, from: usize) -> Result<(usize, f64), ParseJSONError> {
+fn parse_json_number(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, f64)> {
     // If the first char is a minus sign, let's just skip for simplicity
     // in the loop below
     let mut i = match chars.get(from) {
@@ -78,11 +80,7 @@ fn parse_json_number(chars: &Vec<char>, from: usize) -> Result<(usize, f64), Par
     return Ok((i - 1, parsed));
 }
 
-fn parse_json_literal(
-    chars: &Vec<char>,
-    from: usize,
-    literal: &str,
-) -> Result<usize, ParseJSONError> {
+fn parse_json_literal(chars: &Vec<char>, from: usize, literal: &str) -> JSONParseResult<usize> {
     let text = (from..from + literal.len())
         .filter_map(|i| chars.get(i))
         .collect::<String>();
@@ -104,10 +102,7 @@ fn trim_whitespace(chars: &Vec<char>, from: usize) -> usize {
     return i;
 }
 
-fn parse_json_array(
-    chars: &Vec<char>,
-    from: usize,
-) -> Result<(usize, Vec<JSONValue>), ParseJSONError> {
+fn parse_json_array(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, Vec<JSONValue>)> {
     let mut i = from + 1;
 
     let mut output = vec![];
@@ -144,14 +139,11 @@ fn parse_json_array(
     return Ok((i, output));
 }
 
-fn parse_json_object(chars: &Vec<char>, from: usize) -> Result<(usize, Vec<()>), ParseJSONError> {
+fn parse_json_object(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, Vec<()>)> {
     todo!()
 }
 
-pub fn parse_json_value(
-    chars: &Vec<char>,
-    from: usize,
-) -> Result<(usize, JSONValue), ParseJSONError> {
+pub fn parse_json_value(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, JSONValue)> {
     let mut i = from;
 
     i = trim_whitespace(chars, i);
@@ -200,7 +192,7 @@ pub fn parse_json_value(
     return Ok((i, json_value));
 }
 
-pub fn parse_json(string: &str) -> Result<JSONValue, ParseJSONError> {
+pub fn parse_json(string: &str) -> JSONParseResult<JSONValue> {
     let chars = string.chars().collect::<Vec<char>>();
 
     let (_end_index, json_value) = parse_json_value(&chars, 0)?;
