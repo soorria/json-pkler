@@ -129,6 +129,7 @@ fn parse_json_array(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, V
         // so we should error if the array just ends
         if chars.get(i) == Some(&',') {
             i += 1;
+            array_should_end = false;
             is_ok_for_array_to_end = false;
         } else {
             array_should_end = true;
@@ -139,8 +140,42 @@ fn parse_json_array(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, V
     return Ok((i, output));
 }
 
-fn parse_json_object(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, Vec<()>)> {
-    todo!()
+fn parse_json_object(
+    chars: &Vec<char>,
+    from: usize,
+) -> JSONParseResult<(usize, Vec<(String, JSONValue)>)> {
+    let mut i = from + 1;
+
+    let mut output = vec![];
+    let mut object_should_end = false;
+
+    while let Some(ch) = chars.get(i) {
+        i = trim_whitespace(chars, i);
+
+        if ch == &'}' {
+            break;
+        } else if object_should_end {
+            return Err(ParseJSONError("Expected ']' to end array".to_string()));
+        } else if ch == &',' {
+            return Err(ParseJSONError("Unexpected comma".to_string()));
+        }
+
+        // let (end_index, json_value) = parse_json_value(chars, i)?;
+        // output.push(json_value);
+        // i = end_index + 1;
+        // i = trim_whitespace(chars, i);
+
+        // if the next char is a comma, we expect another item in this object
+        // so we should error if the object just ends
+        if chars.get(i) == Some(&',') {
+            i += 1;
+            object_should_end = false;
+        } else {
+            object_should_end = true;
+        }
+    }
+
+    return Ok((i, output));
 }
 
 pub fn parse_json_value(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, JSONValue)> {
@@ -182,6 +217,11 @@ pub fn parse_json_value(chars: &Vec<char>, from: usize) -> JSONParseResult<(usiz
         Some(&'[') => {
             let (end_index, parsed_array) = parse_json_array(chars, i)?;
             (end_index, JSONValue::Array(parsed_array))
+        }
+
+        Some(&'{') => {
+            let (end_index, parsed_object) = parse_json_object(chars, i)?;
+            (end_index, JSONValue::Object(parsed_object))
         }
 
         _ => return Err(ParseJSONError("No JSON value found".to_string())),
@@ -351,7 +391,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn parse_json_empty_object() {
         assert_eq!(parse_json("{}"), Ok(JSONValue::Object(vec![])))
     }
