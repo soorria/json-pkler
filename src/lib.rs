@@ -505,6 +505,30 @@ mod tests {
     }
 
     #[test]
+    fn parse_json_object_missing_colon() {
+        assert_eq!(
+            parse_json_object(&r#"{"a": 1, "b" 2}"#.chars().collect(), 0),
+            Err(ParseJSONError("Expected ':' after object key".to_string()))
+        )
+    }
+
+    #[test]
+    fn parse_json_object_double_comma() {
+        assert_eq!(
+            parse_json_object(&r#"{"a": 1, "b": 2,,}"#.chars().collect(), 0),
+            Err(ParseJSONError("Unexpected comma".to_string()))
+        )
+    }
+
+    #[test]
+    fn parse_json_object_missing_comma() {
+        assert_eq!(
+            parse_json_object(&r#"{"a": 1, "b": 2  "c": 3}"#.chars().collect(), 0),
+            Err(ParseJSONError("Expected '}' to end object".to_string()))
+        )
+    }
+
+    #[test]
     fn parse_json_empty_object_with_space() {
         assert_eq!(parse_json("   {    }   "), Ok(JSONValue::Object(vec![])))
     }
