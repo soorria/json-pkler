@@ -94,7 +94,7 @@ fn parse_json_literal(chars: &Vec<char>, from: usize, literal: &str) -> JSONPars
     };
 }
 
-fn trim_whitespace(chars: &Vec<char>, from: usize) -> usize {
+fn skip_whitespace(chars: &Vec<char>, from: usize) -> usize {
     let mut i = from;
     while matches!(chars.get(i), Some(ch) if ch.is_whitespace()) {
         i += 1;
@@ -109,8 +109,9 @@ fn parse_json_array(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, V
     let mut array_should_end = false;
     let mut is_ok_for_array_to_end = true;
 
+    i = skip_whitespace(chars, i);
     while let Some(ch) = chars.get(i) {
-        i = trim_whitespace(chars, i);
+        i = skip_whitespace(chars, i);
 
         if ch == &']' && is_ok_for_array_to_end {
             break;
@@ -123,12 +124,12 @@ fn parse_json_array(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, V
         let (end_index, json_value) = parse_json_value(chars, i)?;
         output.push(json_value);
         i = end_index + 1;
-        i = trim_whitespace(chars, i);
+        i = skip_whitespace(chars, i);
 
         // if the next char is a comma, we expect another item in this array
         // so we should error if the array just ends
         if chars.get(i) == Some(&',') {
-            i += 1;
+            i = skip_whitespace(chars, i + 1);
             array_should_end = false;
             is_ok_for_array_to_end = false;
         } else {
@@ -148,30 +149,42 @@ fn parse_json_object(
 
     let mut output = vec![];
     let mut object_should_end = false;
+    let mut is_ok_for_object_to_end = true;
 
+    i = skip_whitespace(chars, i);
     while let Some(ch) = chars.get(i) {
-        i = trim_whitespace(chars, i);
+        i = skip_whitespace(chars, i);
 
-        if ch == &'}' {
+        if ch == &'}' && is_ok_for_object_to_end {
             break;
         } else if object_should_end {
-            return Err(ParseJSONError("Expected ']' to end array".to_string()));
+            return Err(ParseJSONError("Expected '}' to end object".to_string()));
         } else if ch == &',' {
             return Err(ParseJSONError("Unexpected comma".to_string()));
         }
 
-        // let (end_index, json_value) = parse_json_value(chars, i)?;
-        // output.push(json_value);
-        // i = end_index + 1;
-        // i = trim_whitespace(chars, i);
+        if chars.get(i) != Some(&'"') {
+            return Err(ParseJSONError(r#"Expected '"' for object key"#.to_string()));
+        }
+        let (key_end_index, key_string) = parse_json_string(chars, i)?;
+        i = skip_whitespace(chars, key_end_index + 1);
 
-        // if the next char is a comma, we expect another item in this object
-        // so we should error if the object just ends
+        if chars.get(i) != Some(&':') {
+            return Err(ParseJSONError("Expected ':' after object key".to_string()));
+        }
+
+        i = skip_whitespace(chars, i + 1);
+        let (value_end_index, parsed_value) = parse_json_value(chars, i)?;
+        output.push((key_string, parsed_value));
+        i = skip_whitespace(chars, value_end_index + 1);
+
         if chars.get(i) == Some(&',') {
-            i += 1;
+            i = skip_whitespace(chars, i + 1);
             object_should_end = false;
+            is_ok_for_object_to_end = false;
         } else {
             object_should_end = true;
+            is_ok_for_object_to_end = true;
         }
     }
 
@@ -181,7 +194,7 @@ fn parse_json_object(
 pub fn parse_json_value(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, JSONValue)> {
     let mut i = from;
 
-    i = trim_whitespace(chars, i);
+    i = skip_whitespace(chars, i);
 
     let ch = chars.get(i);
 
@@ -227,7 +240,7 @@ pub fn parse_json_value(chars: &Vec<char>, from: usize) -> JSONParseResult<(usiz
         _ => return Err(ParseJSONError("No JSON value found".to_string())),
     };
 
-    i = trim_whitespace(chars, value_end_index);
+    i = skip_whitespace(chars, value_end_index);
 
     return Ok((i, json_value));
 }
@@ -391,7 +404,109 @@ mod tests {
     }
 
     #[test]
+    fn parse_json_just_empty_array_with_space() {
+        assert_eq!(parse_json("   [    ]   "), Ok(JSONValue::Array(vec![])))
+    }
+
+    #[test]
     fn parse_json_empty_object() {
         assert_eq!(parse_json("{}"), Ok(JSONValue::Object(vec![])))
+    }
+
+    #[test]
+    fn parse_json_simple_object() {
+        assert_eq!(
+            parse_json(r#"{ "message": "hello!" }"#),
+            Ok(JSONValue::Object(vec![(
+                "message".to_string(),
+                JSONValue::String("hello!".to_string())
+            )]))
+        )
+    }
+
+    #[test]
+    fn parse_json_simple_object_multiple_keys() {
+        assert_eq!(
+            parse_json(r#"{ "message": "things are broken", "success": false}"#),
+            Ok(JSONValue::Object(vec![
+                (
+                    "message".to_string(),
+                    JSONValue::String("things are broken".to_string())
+                ),
+                ("success".to_string(), JSONValue::False)
+            ]))
+        )
+    }
+
+    #[test]
+    fn parse_json_nested_object() {
+        use JSONValue::*;
+        assert_eq!(
+            parse_json(
+                r#"{
+    "data": {
+        "number": 1
+    }
+}"#
+            ),
+            Ok(Object(vec![(
+                "data".to_string(),
+                Object(vec![("number".to_string(), Number(1.0))])
+            )]))
+        )
+    }
+
+    #[test]
+    fn parse_json_complex_object_kitchen_sink() {
+        use JSONValue::*;
+        assert_eq!(
+            parse_json(
+                r#"{
+    "object": {
+        "thing": 1,
+        "another": 2.0e10,
+        "true": false,
+        "exists": null,
+        "items": [
+            {
+                "type": "item thingo"
+            },
+            true,
+            "hey!",
+            [
+                false,
+                true
+            ]
+        ]
+    }
+}"#
+            ),
+            Ok(Object(vec![(
+                "object".to_string(),
+                Object(vec![
+                    ("thing".to_string(), Number(1.0)),
+                    ("another".to_string(), Number(20000000000.0)),
+                    ("true".to_string(), False),
+                    ("exists".to_string(), Null),
+                    (
+                        "items".to_string(),
+                        Array(vec![
+                            Object(vec![(
+                                "type".to_string(),
+                                String("item thingo".to_string())
+                            )]),
+                            True,
+                            String("hey!".to_string()),
+                            Array(vec![False, True])
+                        ])
+                    )
+                ])
+            )]))
+        )
+    }
+
+    #[test]
+    fn parse_json_empty_object_with_space() {
+        assert_eq!(parse_json("   {    }   "), Ok(JSONValue::Object(vec![])))
     }
 }
