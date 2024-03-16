@@ -138,6 +138,7 @@ pub fn parse_json_value(
             (end_index, JSONValue::False)
         }
 
+        // numbers
         Some(ch) if ch.is_numeric() || ch == &'-' => {
             let (end_index, parsed_number) = parse_json_number(&chars, i)?;
             (end_index, JSONValue::Number(parsed_number))
