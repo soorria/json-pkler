@@ -108,12 +108,14 @@ fn parse_json_array(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, V
     let mut output = vec![];
     let mut array_should_end = false;
     let mut is_ok_for_array_to_end = true;
+    let mut has_ended = false;
 
     i = skip_whitespace(chars, i);
     while let Some(ch) = chars.get(i) {
         i = skip_whitespace(chars, i);
 
         if ch == &']' && is_ok_for_array_to_end {
+            has_ended = true;
             break;
         } else if array_should_end {
             return Err(ParseJSONError("Expected ']' to end array".to_string()));
@@ -138,6 +140,12 @@ fn parse_json_array(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, V
         }
     }
 
+    if !has_ended {
+        return Err(ParseJSONError(
+            "Missing closing bracket ']' for array".to_string(),
+        ));
+    }
+
     return Ok((i, output));
 }
 
@@ -150,12 +158,14 @@ fn parse_json_object(
     let mut output = vec![];
     let mut object_should_end = false;
     let mut is_ok_for_object_to_end = true;
+    let mut has_ended = false;
 
     i = skip_whitespace(chars, i);
     while let Some(ch) = chars.get(i) {
         i = skip_whitespace(chars, i);
 
         if ch == &'}' && is_ok_for_object_to_end {
+            has_ended = true;
             break;
         } else if object_should_end {
             return Err(ParseJSONError("Expected '}' to end object".to_string()));
@@ -186,6 +196,12 @@ fn parse_json_object(
             object_should_end = true;
             is_ok_for_object_to_end = true;
         }
+    }
+
+    if !has_ended {
+        return Err(ParseJSONError(
+            "Missing closing brace '}' for object".to_string(),
+        ));
     }
 
     return Ok((i, output));
@@ -383,6 +399,16 @@ mod tests {
     }
 
     #[test]
+    fn parse_json_array_missing_closing_bracket() {
+        assert_eq!(
+            parse_json_array(&"[1, 2 ".chars().collect(), 0),
+            Err(ParseJSONError(
+                "Missing closing bracket ']' for array".to_string()
+            ))
+        )
+    }
+
+    #[test]
     fn parse_json_array_nested_array() {
         assert_eq!(
             parse_json_array(&"[1, [2, [3]]]".chars().collect(), 0),
@@ -501,6 +527,16 @@ mod tests {
                     )
                 ])
             )]))
+        )
+    }
+
+    #[test]
+    fn parse_json_object_missing_closing_brace() {
+        assert_eq!(
+            parse_json_object(&r#"{"a": 1, "b": 2"#.chars().collect(), 0),
+            Err(ParseJSONError(
+                "Missing closing brace '}' for object".to_string()
+            ))
         )
     }
 
