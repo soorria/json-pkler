@@ -144,6 +144,10 @@ fn parse_json_array(
     return Ok((i, output));
 }
 
+fn parse_json_object(chars: &Vec<char>, from: usize) -> Result<(usize, Vec<()>), ParseJSONError> {
+    todo!()
+}
+
 pub fn parse_json_value(
     chars: &Vec<char>,
     from: usize,
