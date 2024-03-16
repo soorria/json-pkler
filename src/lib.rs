@@ -105,6 +105,42 @@ fn trim_whitespace(chars: &Vec<char>, from: usize) -> usize {
     return i;
 }
 
+fn parse_json_array(
+    chars: &Vec<char>,
+    from: usize,
+) -> Result<(usize, Vec<JSONValue>), ParseJSONError> {
+    let mut i = from + 1;
+
+    let mut output = vec![];
+    let mut is_ok_for_array_to_end = true;
+
+    while let Some(ch) = chars.get(i) {
+        i = trim_whitespace(chars, i);
+
+        if ch == &']' && is_ok_for_array_to_end {
+            break;
+        } else if ch == &',' {
+            return Err(ParseJSONError("Unexpected comma".to_string()));
+        }
+
+        let (end_index, json_value) = parse_json_value(chars, i)?;
+        output.push(json_value);
+        i = end_index + 1;
+        i = trim_whitespace(chars, i);
+
+        // if the next char is a comma, we expect another item in this array
+        // so we should error if the array just ends
+        if chars.get(i) == Some(&',') {
+            i += 1;
+            is_ok_for_array_to_end = false;
+        } else {
+            is_ok_for_array_to_end = true;
+        }
+    }
+
+    return Ok((i, output));
+}
+
 pub fn parse_json_value(
     chars: &Vec<char>,
     from: usize,
@@ -142,6 +178,11 @@ pub fn parse_json_value(
         Some(ch) if ch.is_numeric() || ch == &'-' => {
             let (end_index, parsed_number) = parse_json_number(&chars, i)?;
             (end_index, JSONValue::Number(parsed_number))
+        }
+
+        Some(&'[') => {
+            let (end_index, parsed_array) = parse_json_array(chars, i)?;
+            (end_index, JSONValue::Array(parsed_array))
         }
 
         _ => return Err(ParseJSONError("No JSON value found".to_string())),
@@ -239,6 +280,67 @@ mod tests {
     #[test]
     fn parse_json_false() {
         assert_eq!(parse_json("false"), Ok(JSONValue::False));
+    }
+
+    #[test]
+    fn parse_json_array_empty_array() {
+        assert_eq!(
+            parse_json_array(&"[]".chars().collect(), 0),
+            Ok((1, vec![]))
+        )
+    }
+
+    #[test]
+    fn parse_json_array_numbers_array() {
+        assert_eq!(
+            parse_json_array(&"[ 1 , 2 , 3 ]".chars().collect(), 0),
+            Ok((
+                12,
+                vec![
+                    JSONValue::Number(1f64),
+                    JSONValue::Number(2f64),
+                    JSONValue::Number(3f64),
+                ]
+            ))
+        )
+    }
+
+    #[test]
+    fn parse_json_array_trailing_comma() {
+        assert_eq!(
+            parse_json_array(&"[1, 2,]".chars().collect(), 0),
+            Err(ParseJSONError("Unexpected comma".to_string()))
+        )
+    }
+
+    #[test]
+    fn parse_json_array_missing_comma() {
+        assert_eq!(
+            parse_json_array(&"[1, 2  3]".chars().collect(), 0),
+            Err(ParseJSONError("Unexpected comma".to_string()))
+        )
+    }
+
+    #[test]
+    fn parse_json_array_nested_array() {
+        assert_eq!(
+            parse_json_array(&"[1, [2, [3]]]".chars().collect(), 0),
+            Ok((
+                12,
+                vec![
+                    JSONValue::Number(1.0),
+                    JSONValue::Array(vec![
+                        JSONValue::Number(2.0),
+                        JSONValue::Array(vec![JSONValue::Number(3.0),])
+                    ])
+                ]
+            ))
+        )
+    }
+
+    #[test]
+    fn parse_json_just_empty_array() {
+        assert_eq!(parse_json("[]"), Ok(JSONValue::Array(vec![])))
     }
 
     #[test]
