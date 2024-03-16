@@ -256,6 +256,7 @@ pub fn parse_json(string: &str) -> JSONParseResult<JSONValue> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use JSONValue::*;
 
     #[test]
     fn parse_json_string_simple_string() {
@@ -440,7 +441,6 @@ mod tests {
 
     #[test]
     fn parse_json_nested_object() {
-        use JSONValue::*;
         assert_eq!(
             parse_json(
                 r#"{
@@ -458,7 +458,6 @@ mod tests {
 
     #[test]
     fn parse_json_complex_object_kitchen_sink() {
-        use JSONValue::*;
         assert_eq!(
             parse_json(
                 r#"{
