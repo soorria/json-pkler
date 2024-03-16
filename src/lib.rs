@@ -120,9 +120,18 @@ mod tests {
     #[test]
     fn parse_json_string_with_escapes() {
         assert_eq!(
-            parse_json_string(&r#"   "hello\", world!""#.chars().collect(), 3),
-            Ok((19, r#"hello\", world!"#.to_string()))
+            parse_json_string(&r#""hello\", world!""#.chars().collect(), 0),
+            Ok((16, r#"hello\", world!"#.to_string()))
         );
+    }
+
+    #[test]
+    #[ignore]
+    fn parse_json_string_with_unicode() {
+        assert_eq!(
+            parse_json_string(&r#""\u0928""#.chars().collect(), 0),
+            Ok((7, "न".to_string()))
+        )
     }
 
     #[test]
