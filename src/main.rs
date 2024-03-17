@@ -1,8 +1,6 @@
+use json_pkler::parse_json;
+
 fn main() {
-    println!(
-        "Hello, world! {:?}",
-        "-1.2e+3".chars().collect::<Vec<_>>()[0..10]
-            .iter()
-            .collect::<String>()
-    );
+    const BENCH_DATA_001: &str = include_str!("../bench_data/001_package_json.json");
+    let _ = parse_json(BENCH_DATA_001).unwrap();
 }
