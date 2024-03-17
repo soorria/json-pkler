@@ -21,9 +21,13 @@ fn parse_json_string(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, 
     let mut string_end_found = false;
 
     while let Some(ch) = chars.get(i) {
-        if ch == &'"' && chars.get(i - 1) != Some(&'\\') {
+        if ch == &'"' {
             string_end_found = true;
             break;
+        }
+
+        if ch == &'\\' {
+            i += 1;
         }
 
         i += 1;
@@ -270,6 +274,14 @@ mod tests {
             parse_json_string(&r#"   "hello, world!""#.chars().collect(), 3),
             Ok((17, "hello, world!".to_string()))
         );
+    }
+
+    #[test]
+    fn parse_json_string_double_escape_before_closing_quotes() {
+        assert_eq!(
+            parse_json_string(&r#""{{a}}\\""#.chars().collect(), 0),
+            Ok((8, r#"{{a}}\\"#.to_string()))
+        )
     }
 
     #[test]
