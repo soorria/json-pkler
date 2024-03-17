@@ -9,8 +9,6 @@ pub enum JSONValue {
     Null,
 }
 
-pub struct JSONBuilder {}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseJSONError(String);
 
@@ -84,8 +82,8 @@ fn parse_json_literal(chars: &Vec<char>, from: usize, literal: &str) -> JSONPars
     let text = (from..from + literal.len())
         .filter_map(|i| chars.get(i))
         .collect::<String>();
-    let is_null = text == literal;
-    return if is_null {
+    let is_literal = text == literal;
+    return if is_literal {
         Ok(from + literal.len() - 1)
     } else {
         Err(ParseJSONError(
@@ -238,7 +236,7 @@ pub fn parse_json_value(chars: &Vec<char>, from: usize) -> JSONParseResult<(usiz
         }
 
         // numbers
-        Some(ch) if ch.is_numeric() || ch == &'-' => {
+        Some(ch) if ch.is_ascii_digit() || ch == &'-' => {
             let (end_index, parsed_number) = parse_json_number(&chars, i)?;
             (end_index, JSONValue::Number(parsed_number))
         }
