@@ -10,7 +10,7 @@ pub enum JSONValue {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParseJSONError(String);
+pub struct ParseJSONError(&'static str);
 
 type JSONParseResult<T> = Result<T, ParseJSONError>;
 
@@ -30,9 +30,7 @@ fn parse_json_string(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, 
     }
 
     if !string_end_found {
-        return Err(ParseJSONError(String::from(
-            "Missing end quotes for string",
-        )));
+        return Err(ParseJSONError("Missing end quotes for string"));
     }
 
     return Ok((i, chars[from + 1..i].iter().collect()));
@@ -73,7 +71,7 @@ fn parse_json_number(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, 
         .iter()
         .collect::<String>()
         .parse()
-        .map_err(|_| ParseJSONError("Invalid number".to_string()))?;
+        .map_err(|_| ParseJSONError("Invalid number"))?;
 
     return Ok((i - 1, parsed));
 }
@@ -86,9 +84,7 @@ fn parse_json_literal(chars: &Vec<char>, from: usize, literal: &str) -> JSONPars
     return if is_literal {
         Ok(from + literal.len() - 1)
     } else {
-        Err(ParseJSONError(
-            format!("Expected {literal} but got {text}").to_string(),
-        ))
+        Err(ParseJSONError("Unexpected literal"))
     };
 }
 
@@ -116,9 +112,9 @@ fn parse_json_array(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, V
             has_ended = true;
             break;
         } else if array_should_end {
-            return Err(ParseJSONError("Expected ']' to end array".to_string()));
+            return Err(ParseJSONError("Expected ']' to end array"));
         } else if ch == &',' {
-            return Err(ParseJSONError("Unexpected comma".to_string()));
+            return Err(ParseJSONError("Unexpected comma"));
         }
 
         let (end_index, json_value) = parse_json_value(chars, i)?;
@@ -139,9 +135,7 @@ fn parse_json_array(chars: &Vec<char>, from: usize) -> JSONParseResult<(usize, V
     }
 
     if !has_ended {
-        return Err(ParseJSONError(
-            "Missing closing bracket ']' for array".to_string(),
-        ));
+        return Err(ParseJSONError("Missing closing bracket ']' for array"));
     }
 
     return Ok((i, output));
@@ -166,19 +160,19 @@ fn parse_json_object(
             has_ended = true;
             break;
         } else if object_should_end {
-            return Err(ParseJSONError("Expected '}' to end object".to_string()));
+            return Err(ParseJSONError("Expected '}' to end object"));
         } else if ch == &',' {
-            return Err(ParseJSONError("Unexpected comma".to_string()));
+            return Err(ParseJSONError("Unexpected comma"));
         }
 
         if chars.get(i) != Some(&'"') {
-            return Err(ParseJSONError(r#"Expected '"' for object key"#.to_string()));
+            return Err(ParseJSONError(r#"Expected '"' for object key"#));
         }
         let (key_end_index, key_string) = parse_json_string(chars, i)?;
         i = skip_whitespace(chars, key_end_index + 1);
 
         if chars.get(i) != Some(&':') {
-            return Err(ParseJSONError("Expected ':' after object key".to_string()));
+            return Err(ParseJSONError("Expected ':' after object key"));
         }
 
         i = skip_whitespace(chars, i + 1);
@@ -197,9 +191,7 @@ fn parse_json_object(
     }
 
     if !has_ended {
-        return Err(ParseJSONError(
-            "Missing closing brace '}' for object".to_string(),
-        ));
+        return Err(ParseJSONError("Missing closing brace '}' for object"));
     }
 
     return Ok((i, output));
@@ -251,7 +243,7 @@ pub fn parse_json_value(chars: &Vec<char>, from: usize) -> JSONParseResult<(usiz
             (end_index, JSONValue::Object(parsed_object))
         }
 
-        _ => return Err(ParseJSONError("No JSON value found".to_string())),
+        _ => return Err(ParseJSONError("No JSON value found")),
     };
 
     i = skip_whitespace(chars, value_end_index);
@@ -292,7 +284,7 @@ mod tests {
     fn parse_json_string_incomplete_string_err() {
         assert_eq!(
             parse_json_string(&r#""hello, world!"#.chars().collect(), 0),
-            Err(ParseJSONError("Missing end quotes for string".to_string()))
+            Err(ParseJSONError("Missing end quotes for string"))
         );
     }
 
@@ -376,7 +368,7 @@ mod tests {
     fn parse_json_array_trailing_comma() {
         assert_eq!(
             parse_json_array(&"[1, 2,]".chars().collect(), 0),
-            Err(ParseJSONError("No JSON value found".to_string()))
+            Err(ParseJSONError("No JSON value found"))
         )
     }
 
@@ -384,7 +376,7 @@ mod tests {
     fn parse_json_array_double_comma() {
         assert_eq!(
             parse_json_array(&"[1, 2,,]".chars().collect(), 0),
-            Err(ParseJSONError("Unexpected comma".to_string()))
+            Err(ParseJSONError("Unexpected comma"))
         )
     }
 
@@ -392,7 +384,7 @@ mod tests {
     fn parse_json_array_missing_comma() {
         assert_eq!(
             parse_json_array(&"[1, 2  3]".chars().collect(), 0),
-            Err(ParseJSONError("Expected ']' to end array".to_string()))
+            Err(ParseJSONError("Expected ']' to end array"))
         )
     }
 
@@ -400,9 +392,7 @@ mod tests {
     fn parse_json_array_missing_closing_bracket() {
         assert_eq!(
             parse_json_array(&"[1, 2 ".chars().collect(), 0),
-            Err(ParseJSONError(
-                "Missing closing bracket ']' for array".to_string()
-            ))
+            Err(ParseJSONError("Missing closing bracket ']' for array"))
         )
     }
 
@@ -532,9 +522,7 @@ mod tests {
     fn parse_json_object_missing_closing_brace() {
         assert_eq!(
             parse_json_object(&r#"{"a": 1, "b": 2"#.chars().collect(), 0),
-            Err(ParseJSONError(
-                "Missing closing brace '}' for object".to_string()
-            ))
+            Err(ParseJSONError("Missing closing brace '}' for object"))
         )
     }
 
@@ -542,7 +530,7 @@ mod tests {
     fn parse_json_object_missing_colon() {
         assert_eq!(
             parse_json_object(&r#"{"a": 1, "b" 2}"#.chars().collect(), 0),
-            Err(ParseJSONError("Expected ':' after object key".to_string()))
+            Err(ParseJSONError("Expected ':' after object key"))
         )
     }
 
@@ -550,7 +538,7 @@ mod tests {
     fn parse_json_object_double_comma() {
         assert_eq!(
             parse_json_object(&r#"{"a": 1, "b": 2,,}"#.chars().collect(), 0),
-            Err(ParseJSONError("Unexpected comma".to_string()))
+            Err(ParseJSONError("Unexpected comma"))
         )
     }
 
@@ -558,7 +546,7 @@ mod tests {
     fn parse_json_object_missing_comma() {
         assert_eq!(
             parse_json_object(&r#"{"a": 1, "b": 2  "c": 3}"#.chars().collect(), 0),
-            Err(ParseJSONError("Expected '}' to end object".to_string()))
+            Err(ParseJSONError("Expected '}' to end object"))
         )
     }
 
