@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+cargo build --release
+hyperfine --warmup 10 './target/release/json_pkler'
